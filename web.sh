@@ -26,16 +26,15 @@ if [ -n "${headers[Cookie]}" ]; then
 
 fi
 
-
-url="${request#GET }"
-if [ -n "$get_url" ]; then
+if [[ $request =~ ^GET ]]
+then
+    url="${request#GET }"
     method=get
-    url="${get_url% HTTP/*}"
 else
     url="${request#POST }"
     method=post
-    url="${get_url% HTTP/*}"
 fi
+url="${url% HTTP/*}"
 
 function static() {
     static_base=/home/ducheng/entry
@@ -56,20 +55,40 @@ function static() {
     fi
 }
 
+function login() {
+    echo -e "HTTP/1.1 200 OK\r"
+    echo -e "Content-Type: application/json\r"
+    echo -e "Set-Cookie: sessionid=haha"
+    echo -e "Set-Cookie: testing=ok str"
+    echo -e "\r"
+    echo -e "{\"login\":\"ok\"}"
+    echo -e "\r"
+}
+
+function upload() {
+    if [ $method == "get" ]; then
+        echo -e "HTTP/1.1 405 Method Not Allowed\r"
+        echo -e "\r"
+    else
+        content="OK haha"
+        echo -e "HTTP/1.1 200 OK\r"
+        echo -e "Content-Type: text/plain\r"
+        echo -e "Content-Length: ${#content}\r"
+        echo -e "\r"
+        echo -e $content
+        echo -e "\r"
+    fi
+}
+
 function application() {
     url=$1
     case $url in
         "/")
             static /templates/index.html;;
         "/login")
-            echo -e "HTTP/1.1 200 OK\r"
-            echo -e "Content-Type: application/json\r"
-            echo -e "Set-Cookie: sessionid=haha"
-            echo -e "Set-Cookie: testing=ok str"
-            echo -e "\r"
-            echo -e "{\"login\":\"ok\"}"
-            echo -e "\r"
-            ;;
+            login ;;
+        "/upload")
+            upload ;;
     esac
 }
 
