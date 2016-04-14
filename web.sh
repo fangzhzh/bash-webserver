@@ -70,12 +70,30 @@ function upload() {
         echo -e "HTTP/1.1 405 Method Not Allowed\r"
         echo -e "\r"
     else
-        content="OK haha"
-        echo -e "HTTP/1.1 200 OK\r"
-        echo -e "Content-Type: text/plain\r"
-        echo -e "Content-Length: ${#content}\r"
+        echo -e "HTTP/1.1 100 Continue\r"
         echo -e "\r"
-        echo -e $content
+        content="${headers['Content-Type']}"
+        length="${headers['Content-Length']}"
+        separator=--${content#multipart/form-data; boundary=}
+        content=$separator
+        sofar=0
+        while true
+        do
+            read line
+            sofar=$(expr $sofar + ${#line})
+            [ "$line" == $'\r' ] && break
+        done
+
+        length=$(echo $length | tr '\r' ' ')
+        length=$(expr $length \- $sofar \- 52)
+
+
+        echo -e "HTTP/1.1 200 OK\r"
+        echo -e "Content-Type: image/png\r"
+        echo -e "Content-Length: ${length}\r"
+        echo -e "\r"
+        #echo -e $content
+        head -c $length 
         echo -e "\r"
     fi
 }
