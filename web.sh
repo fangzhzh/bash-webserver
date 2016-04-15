@@ -44,7 +44,6 @@ function static() {
         echo -e "Content-Type: `/usr/bin/file -bi \"$filename\"`\r"
         echo -e "\r"
         cat "$filename"
-        echo -e "\r"
     else
         echo -e "HTTP/1.1 404 Not Found\r"
         echo -e "Content-Type: text/html\r"
@@ -66,6 +65,7 @@ function login() {
 }
 
 function upload() {
+    upload_base=/home/ducheng/entry/static/images
     if [ $method == "get" ]; then
         echo -e "HTTP/1.1 405 Method Not Allowed\r"
         echo -e "\r"
@@ -74,27 +74,31 @@ function upload() {
         echo -e "\r"
         content="${headers['Content-Type']}"
         length="${headers['Content-Length']}"
-        separator=--${content#multipart/form-data; boundary=}
-        content=$separator
+        boundary=${content#multipart/form-data; boundary=}
+        separator=--$boundary
+        end_separator=$separator--
         sofar=0
+        length=$(echo $length | tr '\r' ' ')
+        left=$length
+
         while true
         do
             read line
-            sofar=$(expr $sofar + ${#line})
+            left=$(expr $left \- ${#line} \- 1)
             [ "$line" == $'\r' ] && break
         done
 
-        length=$(echo $length | tr '\r' ' ')
-        length=$(expr $length \- $sofar \- 52)
+        uuid=$(uuidgen)
 
+        upload_file_size=$(expr $left \- ${#end_separator} \- 3)
+        head -c $upload_file_size > $upload_base/$uuid
+        head -c $(expr ${#end_separator} + 3) > /dev/null
 
-        echo -e "HTTP/1.1 200 OK\r"
-        echo -e "Content-Type: image/png\r"
-        echo -e "Content-Length: ${length}\r"
-        echo -e "\r"
-        #echo -e $content
-        head -c $length 
-        echo -e "\r"
+        printf "HTTP/1.1 200 OK\r\n"
+        printf "Content-Type: text/plain\r\n"
+        printf "Content-Length: ${#uuid}\r\n"
+        printf "\r\n"
+        printf $uuid
     fi
 }
 
