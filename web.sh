@@ -1,5 +1,5 @@
 #!/bin/bash
-base=/home/ducheng/entry
+base=$(dirname $0)
 
 
 read request
@@ -37,7 +37,7 @@ fi
 url="${url% HTTP/*}"
 
 function static() {
-    static_base=/home/ducheng/entry
+    static_base=$base
     filename="$static_base$1"
     if [ -f "$filename" ]; then
         echo -e "HTTP/1.1 200 OK\r"
@@ -55,17 +55,40 @@ function static() {
 }
 
 function login() {
-    echo -e "HTTP/1.1 200 OK\r"
-    echo -e "Content-Type: application/json\r"
-    echo -e "Set-Cookie: sessionid=haha"
-    echo -e "Set-Cookie: testing=ok str"
-    echo -e "\r"
-    echo -e "{\"login\":\"ok\"}"
-    echo -e "\r"
+    content_length=${headers["Content-Length"]}
+    content_length=$(echo $content_length | tr '\r' ' ')
+    post_str=$(head -c $content_length)
+
+    declare -A POST
+    IFS="&" read -a post_param <<< "$post_str"
+    len=${#post_param[@]}
+    for (( i=0; i<$len; i++ ))
+    do
+        line=${post_param[$i]}
+        IFS='=' read -a pair <<< $line
+        POST[${pair[0]}]="${pair[1]}"
+    done
+    username=${POST[username]}
+    password=${POST[password]}
+    result=$(echo "select * from users where username=\"$username\" and password=password(\"$password\")" | mysql -u entry_user -h 203.117.172.31 -pentry_password -D entry_task | tail -n 1)
+    if [ -n "$result" ]
+    then
+        echo -e "HTTP/1.1 200 OK\r"
+        echo -e "Content-Type: application/json\r"
+        echo -e "Content-Length: ${#result}\r"
+        echo -e "Set-Cookie: sessionid=haha"
+        echo -e "Set-Cookie: testing=ok str"
+        echo -e "\r"
+        echo -e "$result"
+        echo -e "\r"
+    else
+        echo -e "HTTP/1.1 403 Forbidden\r"
+        echo -e "\r"
+    fi
 }
 
 function upload() {
-    upload_base=/home/ducheng/entry/static/images
+    upload_base=$base/static/images
     if [ $method == "get" ]; then
         echo -e "HTTP/1.1 405 Method Not Allowed\r"
         echo -e "\r"
