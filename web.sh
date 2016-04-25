@@ -54,36 +54,46 @@ function static() {
     fi
 }
 
-function login() {
-    content_length=${headers["Content-Length"]}
-    content_length=$(echo $content_length | tr '\r' ' ')
-    post_str=$(head -c $content_length)
+function set_session_cache() {
+    echo $@ >> /tmp/entry.cache
+}
+function get_session_cache() {
+    grep $1 /tmp/entry.cache
+}
 
-    declare -A POST
-    IFS="&" read -a post_param <<< "$post_str"
-    len=${#post_param[@]}
-    for (( i=0; i<$len; i++ ))
-    do
-        line=${post_param[$i]}
-        IFS='=' read -a pair <<< $line
-        POST[${pair[0]}]="${pair[1]}"
-    done
-    username=${POST[username]}
-    password=${POST[password]}
-    result=$(echo "select * from users where username=\"$username\" and password=password(\"$password\")" | mysql -u entry_user -h 203.117.172.31 -pentry_password -D entry_task | tail -n 1)
-    if [ -n "$result" ]
+function login() {
+    if [ "$method" == "post" ]
     then
-        echo -e "HTTP/1.1 200 OK\r"
-        echo -e "Content-Type: application/json\r"
-        echo -e "Content-Length: ${#result}\r"
-        echo -e "Set-Cookie: sessionid=haha"
-        echo -e "Set-Cookie: testing=ok str"
-        echo -e "\r"
-        echo -e "$result"
-        echo -e "\r"
+        content_length=${headers["Content-Length"]}
+        content_length=$(echo $content_length | tr '\r' ' ')
+        post_str=$(head -c $content_length)
+
+        declare -A POST
+        IFS="&" read -a post_param <<< "$post_str"
+        len=${#post_param[@]}
+        for (( i=0; i<$len; i++ ))
+        do
+            line=${post_param[$i]}
+            IFS='=' read -a pair <<< $line
+            POST[${pair[0]}]="${pair[1]}"
+        done
+        username=${POST[username]}
+        password=${POST[password]}
+        result=$(echo "select username, profile from users where username=\"$username\" and password=password(\"$password\")" | mysql -u entry_user -h 203.117.172.31 -pentry_password -D entry_task 2>/dev/null | tail -n 1)
+        if [ -n "$result" ]
+        then
+            session_key=$(uuidgen)
+            set_session_cache $session_key $result
+            echo -e "HTTP/1.1 302 Found\r"
+            echo -e "Set-Cookie: sessionid=${session_key}\r"
+            echo -e "Location: /\r"
+            echo -e "\r"
+        else
+            echo -e "HTTP/1.1 403 Forbidden\r"
+            echo -e "\r"
+        fi
     else
-        echo -e "HTTP/1.1 403 Forbidden\r"
-        echo -e "\r"
+        static /templates/login.html
     fi
 }
 
