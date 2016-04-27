@@ -58,7 +58,8 @@ function set_session_cache() {
     echo $@ >> /tmp/entry.cache
 }
 function get_session_cache() {
-    grep $1 /tmp/entry.cache
+    sessionid=$(echo $1 | tr '\r' ' ')
+    [ -n "$sessionid" ] && grep "$sessionid" /tmp/entry.cache
 }
 
 function login() {
@@ -135,11 +136,23 @@ function upload() {
     fi
 }
 
+function home() {
+    sessionid=${cookies[sessionid]}
+    session=$(get_session_cache "$sessionid")
+    if [ -z "$session" ]; then
+        echo -e "HTTP/1.1 302 Found\r"
+        echo -e "Location: /login\r"
+        echo -e "\r"
+    else
+        static /templates/index.html
+    fi
+}
+
 function application() {
     url=$1
     case $url in
         "/")
-            static /templates/index.html;;
+            home ;;
         "/login")
             login ;;
         "/upload")
